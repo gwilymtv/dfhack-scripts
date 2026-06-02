@@ -7,12 +7,15 @@ automandate
 
 When a noble issues a production mandate (e.g. "Make maces (0/3)"),
 ``automandate`` resolves the mandated item to its production job and queues a
-manager work order to satisfy it. Mandates with a specific material requested
-produce orders restricted to that material; mandates with no material produce
-unrestricted orders.
+manager work order to satisfy it. Mandates with no specific material requested
+pick the most abundant usable material in the fort (metal, stone, wood, leather,
+cloth, or bone).
 
-Existing matching orders are reconciled rather than duplicated, so it is safe to
-run ``automandate now`` repeatedly.
+Existing matching orders count toward the mandate: if they already cover the
+mandated quantity (or an order is set to repeat indefinitely), nothing is added.
+If they fall short, ``automandate`` adds a *new* order for just the remaining
+quantity -- it never modifies an existing order, whose count may be deliberate.
+This makes it safe to run ``automandate now`` repeatedly.
 
 Usage
 -----

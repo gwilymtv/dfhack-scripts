@@ -349,18 +349,26 @@ local function resolve_target(m)
     }
 end
 
--- An any-material mandate is satisfied by ANY existing order for the item; a
--- material-specific mandate needs an order of that material.
-local function find_matching_order(t)
+-- How much of this mandate is already covered by existing manager orders. An
+-- any-material mandate is covered by ANY order for the item; a material-specific
+-- one only by orders of that material. Coverage counts each matching order's
+-- amount_left (its remaining future output); an infinite order (amount_total 0)
+-- covers any quantity. We never modify these orders -- their counts may be
+-- deliberate -- we only top up the shortfall with a separate new order.
+local function matching_coverage(t)
+    local covered = 0
     for _, o in ipairs(world.manager_orders.all) do
-        if o.job_type == t.job_id and o.item_subtype == t.subtype then
-            if t.any_material then return o end
-            if o.mat_type == t.mat_type and o.mat_index == t.mat_index then return o end
+        if o.job_type == t.job_id and o.item_subtype == t.subtype
+            and (t.any_material or (o.mat_type == t.mat_type and o.mat_index == t.mat_index))
+        then
+            if o.amount_total == 0 then return math.huge end
+            covered = covered + o.amount_left
         end
     end
+    return covered
 end
 
-local function create_order(t, choice)
+local function create_order(t, choice, amount)
     local order = df.manager_order:new()
     order.id = world.manager_orders.manager_order_next_id
     world.manager_orders.manager_order_next_id = order.id + 1
@@ -380,8 +388,8 @@ local function create_order(t, choice)
         order.mat_index = -1
         order.material_category[choice.cat] = true
     end
-    order.amount_left = t.amount
-    order.amount_total = t.amount
+    order.amount_left = amount
+    order.amount_total = amount
     order.frequency = df.workquota_frequency_type.OneTime
     world.manager_orders.all:insert('#', order)
     return order
@@ -421,19 +429,30 @@ local function process_mandates(create)
         elseif unsup then
             print('      -> SKIP: ' .. unsup .. ' (material class not yet supported)')
             unsupported = unsupported + 1
-        elseif find_matching_order(t) then
-            print(('      -> %s x%d  [matching order already queued]'):format(t.job_name, t.amount))
-            queued = queued + 1
         else
-            local choice, cands
-            if t.any_material then
-                choice, cands = choose_material(t.item_type, t.subtype, accessible)
+            local covered = matching_coverage(t)
+            local shortfall = t.amount - covered -- math.huge coverage -> negative
+            if shortfall <= 0 then
+                local cov = covered == math.huge and 'infinite' or tostring(covered)
+                print(('      -> %s  [%s already queued, covers mandate of %d]'):format(
+                    t.job_name, cov, t.amount))
+                queued = queued + 1
+            else
+                local choice, cands
+                if t.any_material then
+                    choice, cands = choose_material(t.item_type, t.subtype, accessible)
+                end
+                local matstr = choice and choice.desc or material_desc(t.mat_type, t.mat_index)
+                if covered > 0 then
+                    print(('      -> %s x%d (%s)  [%d already queued, +%d to meet %d]'):format(
+                        t.job_name, shortfall, matstr, covered, shortfall, t.amount))
+                else
+                    print(('      -> %s x%d (%s)'):format(t.job_name, shortfall, matstr))
+                end
+                if cands then print_candidates(cands) end
+                if create then create_order(t, choice, shortfall) end
+                pending = pending + 1
             end
-            local matstr = choice and choice.desc or material_desc(t.mat_type, t.mat_index)
-            print(('      -> %s x%d (%s)'):format(t.job_name, t.amount, matstr))
-            if cands then print_candidates(cands) end
-            if create then create_order(t, choice) end
-            pending = pending + 1
         end
     end
     print()
