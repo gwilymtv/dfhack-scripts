@@ -62,6 +62,9 @@ Filtering and sorting
   ascending first, everything else descending first. The ``Sort by`` selector is
   a keyboard-friendly fallback for the name/quantity/value/quality/wear columns.
 - ``Group items`` collapses identical items into a single counted row.
+- The header line shows running totals for the current view: ``Items`` is the
+  number of rows shown and ``Qty`` is the total physical item count, both
+  updated live as you filter, search, and group.
 
 Selecting and acting on items
 -----------------------------
