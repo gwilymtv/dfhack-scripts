@@ -9,6 +9,9 @@ local widgets = require('gui.widgets')
 local QTY_COL_WIDTH = 6
 local VALUE_COL_WIDTH = 9
 
+-- width of the right-aligned "Items: N  Qty: N" totals readout on the header line
+local TOTALS_W = 26
+
 -- minimum usable window dimensions
 local MIN_W, MIN_H = 78, 30
 
@@ -473,6 +476,13 @@ function StockView:init()
                     text_pen=COLOR_GRAY,
                     on_sort=self:callback('set_sort'),
                 },
+                -- running totals for the currently visible (post-filter) list,
+                -- right-aligned on the header line
+                widgets.Label{
+                    view_id='totals',
+                    frame={t=0, r=1, w=TOTALS_W},
+                    text='',
+                },
                 widgets.FilteredList{
                     view_id='list',
                     frame={l=0, t=2, r=0, b=0},
@@ -549,7 +559,12 @@ function StockView:init()
     self.subviews.list.list.frame.t = 0
     self.subviews.list.edit.visible = false
     self.subviews.list.edit = self.subviews.search
-    self.subviews.search.on_change = self.subviews.list:callback('onFilterChange')
+    -- keep the totals in sync as the search narrows the visible list
+    local on_filter = self.subviews.list:callback('onFilterChange')
+    self.subviews.search.on_change = function(text)
+        on_filter(text)
+        self:update_totals()
+    end
 
     -- the widget defaults define the baseline; apply persisted settings on top
     -- (window size was already applied above)
@@ -558,6 +573,7 @@ function StockView:init()
     self:apply_settings(saved)
 
     self.subviews.list:setChoices(self:get_choices())
+    self:update_totals()
 end
 
 -- -------------------
@@ -715,6 +731,30 @@ function StockView:refresh_list()
     list:setFilter('')
     list:setChoices(self:get_choices(), list:getSelected())
     list:setFilter(saved_filter)
+    self:update_totals()
+end
+
+-- recompute the header-line totals from the visible (post-filter, post-search)
+-- list: 'Items' is the number of rows shown; 'Qty' is the physical item count
+-- (a grouped row counts its whole stack, an ungrouped row counts as one)
+function StockView:update_totals()
+    local rows, qty = 0, 0
+    for _, c in ipairs(self.subviews.list:getVisibleChoices()) do
+        rows = rows + 1
+        qty = qty + (c.item_id and 1 or c.data.quantity)
+    end
+    local items_str, qty_str = dfhack.formatInt(rows), dfhack.formatInt(qty)
+    -- right-justify by padding to the box width, so the readout hugs the right
+    -- edge regardless of how many digits it carries
+    local content_w = 7 + #items_str + 2 + 5 + #qty_str  -- 'Items: '..N..'  '..'Qty: '..N
+    local pad = (' '):rep(math.max(0, TOTALS_W - content_w))
+    self.subviews.totals:setText{
+        {text=pad},
+        {text='Items: ', pen=COLOR_GRAY},
+        {text=items_str, pen=COLOR_WHITE},
+        {gap=2, text='Qty: ', pen=COLOR_GRAY},
+        {text=qty_str, pen=COLOR_WHITE},
+    }
 end
 
 -- set the active sort and reflect it in the selector and header (no list refresh)
