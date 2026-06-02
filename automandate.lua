@@ -99,9 +99,10 @@ end
 -- material selection for "any material" mandates (v2: metal, stone, wood,
 -- leather, cloth, bone)
 -- ------------------------------------------------------------------
--- each class says where to count its input stock and how to encode the order:
---   kind='inorganic' -> encode mat_type=0, mat_index=<best material> (or -1)
---   kind='category'  -> encode material_category[cat]=true, mat=-1:-1
+-- each class says where to count its input stock and how candidates encode:
+--   kind='inorganic' -> per-material candidates, mat_type=0, mat_index=<idx>
+--   kind='glass'     -> per-glass-type candidates, builtin glass mat_type
+--   kind='category'  -> one candidate, material_category[cat]=true, mat=-1:-1
 local CLASSES = {
     metal   = {other = 'BAR',         kind = 'inorganic'},
     stone   = {other = 'BOULDER',     kind = 'inorganic'},
@@ -109,7 +110,21 @@ local CLASSES = {
     leather = {other = 'SKIN_TANNED', kind = 'category', cat = 'leather'},
     cloth   = {other = 'CLOTH',       kind = 'category', cat = 'cloth'},
     bone    = {other = 'CORPSEPIECE', kind = 'category', cat = 'bone', bone = true},
+    glass   = {kind = 'glass'},
 }
+
+-- builtin glass material types. Glass is made on demand from sand, so even with
+-- no raw glass in stock we always offer green glass as a fallback.
+local GLASS_SET = {}
+for _, gt in ipairs({df.builtin_mats.GLASS_GREEN, df.builtin_mats.GLASS_CLEAR,
+                     df.builtin_mats.GLASS_CRYSTAL}) do
+    GLASS_SET[gt] = true
+end
+
+local function mat_name(mat_type, mat_index)
+    local m = dfhack.matinfo.decode(mat_type, mat_index)
+    return m and m:toString() or ('material ' .. mat_type .. ':' .. mat_index)
+end
 
 -- armor/clothing/shields carry an armor_properties.props.flags flagarray that
 -- precisely says which material classes each subtype permits (so a breastplate
@@ -149,11 +164,9 @@ local function tool_classes(def)
     return flagset_to_classes(set)
 end
 
--- items whose only valid materials are classes v2 does not handle (glass, cut
--- gems, or items assembled from components). Listed but not auto-created.
+-- items we can't pick a material for: assembled from components, no single
+-- material. Listed but not auto-created.
 local UNSUPPORTED = {
-    WINDOW = 'glass only',
-    GEM = 'cut from a rough gem',
     TRACTION_BENCH = 'assembled from components',
 }
 
@@ -177,7 +190,10 @@ local ITEM_CLASSES = {
     RING = {'metal', 'stone', 'wood', 'bone'},
     CROWN = {'metal', 'stone', 'wood', 'bone'},
     SCEPTER = {'metal', 'stone', 'wood', 'bone'},
+    -- a "large gem" can be cut from almost anything (metal, stone, wood, ...)
+    GEM = {'metal', 'stone', 'wood', 'bone'},
     COIN = {'metal'},
+    WINDOW = {'glass'},
     -- material-restricted furniture/parts (default below is stone/metal/wood)
     BED = {'wood'},
     QUERN = {'stone'},
@@ -227,21 +243,40 @@ local function is_bone_item(item)
 end
 
 -- gather every usable material candidate for an item across its valid classes,
--- as a list sorted by descending stock count. Inorganic classes contribute one
--- candidate per concrete material (iron, copper, ...); organic classes
--- contribute a single "any <category>" candidate (the order doesn't pin a
--- species). Each candidate carries the fields create_order needs plus a desc.
+-- sorted by descending stock count. Inorganic/glass classes contribute one
+-- candidate per concrete material (iron, green glass, ...); organic classes
+-- contribute a single "any <category>" candidate. Each class always yields at
+-- least one candidate (count 0 when out of stock) so a valid order is always
+-- producible. Candidate kinds:
+--   'material' -> encode mat_type/mat_index directly (inorganic or glass)
+--   'category' -> encode material_category[cat], mat=-1:-1
 local function gather_candidates(item_type, subtype, accessible)
     accessible = accessible or get_accessible_groups()
     local cands = {}
     for _, class in ipairs(valid_classes(item_type, subtype)) do
         local cdef = CLASSES[class]
-        local vec = world.items.other[df.items_other_id[cdef.other]]
-        if cdef.kind == 'inorganic' then
+        local before = #cands
+        if cdef.kind == 'glass' then
+            local counts = {}
+            for _, item in ipairs(world.items.other[df.items_other_id.ROUGH]) do
+                if GLASS_SET[item.mat_type] and item_is_usable(item, accessible) then
+                    counts[item.mat_type] = (counts[item.mat_type] or 0) + item.stack_size
+                end
+            end
+            for gt, n in pairs(counts) do
+                cands[#cands + 1] = {kind = 'material', class = class,
+                    mat_type = gt, mat_index = -1, count = n, desc = mat_name(gt, -1)}
+            end
+            if #cands == before then -- no raw glass stocked; default to green glass
+                local gt = df.builtin_mats.GLASS_GREEN
+                cands[#cands + 1] = {kind = 'material', class = class,
+                    mat_type = gt, mat_index = -1, count = 0, desc = mat_name(gt, -1)}
+            end
+        elseif cdef.kind == 'inorganic' then
             -- gate on the item's capability flag so e.g. gold is kept out of weapons
             local req = required_mat_flag(item_type)
             local counts = {}
-            for _, item in ipairs(vec) do
+            for _, item in ipairs(world.items.other[df.items_other_id[cdef.other]]) do
                 if item.mat_type == 0 and item_is_usable(item, accessible) then
                     local mi = dfhack.matinfo.decode(item)
                     if mi and mi.material and mi.material.flags[req] then
@@ -250,22 +285,21 @@ local function gather_candidates(item_type, subtype, accessible)
                 end
             end
             for idx, n in pairs(counts) do
-                local mi = dfhack.matinfo.decode(0, idx)
-                cands[#cands + 1] = {
-                    kind = 'inorganic', class = class, mat_index = idx, count = n,
-                    desc = mi and mi:toString() or ('inorganic#' .. tostring(idx)),
-                }
+                cands[#cands + 1] = {kind = 'material', class = class,
+                    mat_type = 0, mat_index = idx, count = n, desc = mat_name(0, idx)}
             end
-        else
+            if #cands == before then
+                cands[#cands + 1] = {kind = 'material', class = class,
+                    mat_type = 0, mat_index = -1, count = 0, desc = 'any ' .. class}
+            end
+        else -- category (organic)
             local n = 0
-            for _, item in ipairs(vec) do
+            for _, item in ipairs(world.items.other[df.items_other_id[cdef.other]]) do
                 if (not cdef.bone or is_bone_item(item)) and item_is_usable(item, accessible) then
                     n = n + item.stack_size
                 end
             end
-            if n > 0 then
-                cands[#cands + 1] = {kind = 'category', class = class, cat = cdef.cat, count = n, desc = class}
-            end
+            cands[#cands + 1] = {kind = 'category', class = class, cat = cdef.cat, count = n, desc = class}
         end
     end
     table.sort(cands, function(a, b) return a.count > b.count end)
@@ -273,18 +307,9 @@ local function gather_candidates(item_type, subtype, accessible)
 end
 
 -- returns (chosen, candidates): the most abundant candidate plus the full list.
--- When nothing is in stock, returns a valid "any" choice and an empty list.
 local function choose_material(item_type, subtype, accessible)
     local cands = gather_candidates(item_type, subtype, accessible)
-    if cands[1] then return cands[1], cands end
-    local classes = valid_classes(item_type, subtype)
-    local cdef = CLASSES[classes[1]]
-    if cdef.kind == 'inorganic' then
-        return {kind = 'inorganic', class = classes[1], mat_index = -1, count = 0,
-                desc = 'any ' .. classes[1]}, cands
-    end
-    return {kind = 'category', class = classes[1], cat = cdef.cat, count = 0,
-            desc = classes[1]}, cands
+    return cands[1], cands
 end
 
 -- print the ranked candidate list under a result line (top = chosen)
@@ -349,18 +374,26 @@ local function resolve_target(m)
     }
 end
 
--- An any-material mandate is satisfied by ANY existing order for the item; a
--- material-specific mandate needs an order of that material.
-local function find_matching_order(t)
+-- How much of this mandate is already covered by existing manager orders. An
+-- any-material mandate is covered by ANY order for the item; a material-specific
+-- one only by orders of that material. Coverage counts each matching order's
+-- amount_left (its remaining future output); an infinite order (amount_total 0)
+-- covers any quantity. We never modify these orders -- their counts may be
+-- deliberate -- we only top up the shortfall with a separate new order.
+local function matching_coverage(t)
+    local covered = 0
     for _, o in ipairs(world.manager_orders.all) do
-        if o.job_type == t.job_id and o.item_subtype == t.subtype then
-            if t.any_material then return o end
-            if o.mat_type == t.mat_type and o.mat_index == t.mat_index then return o end
+        if o.job_type == t.job_id and o.item_subtype == t.subtype
+            and (t.any_material or (o.mat_type == t.mat_type and o.mat_index == t.mat_index))
+        then
+            if o.amount_total == 0 then return math.huge end
+            covered = covered + o.amount_left
         end
     end
+    return covered
 end
 
-local function create_order(t, choice)
+local function create_order(t, choice, amount)
     local order = df.manager_order:new()
     order.id = world.manager_orders.manager_order_next_id
     world.manager_orders.manager_order_next_id = order.id + 1
@@ -372,16 +405,16 @@ local function create_order(t, choice)
     if not t.any_material then
         order.mat_type = t.mat_type
         order.mat_index = t.mat_index
-    elseif choice.kind == 'inorganic' then
-        order.mat_type = 0
-        order.mat_index = choice.mat_index -- -1 = any inorganic
-    else -- 'category'
+    elseif choice.kind == 'category' then
         order.mat_type = -1
         order.mat_index = -1
         order.material_category[choice.cat] = true
+    else -- 'material': inorganic (mat_type 0) or glass (builtin glass type)
+        order.mat_type = choice.mat_type
+        order.mat_index = choice.mat_index
     end
-    order.amount_left = t.amount
-    order.amount_total = t.amount
+    order.amount_left = amount
+    order.amount_total = amount
     order.frequency = df.workquota_frequency_type.OneTime
     world.manager_orders.all:insert('#', order)
     return order
@@ -407,7 +440,10 @@ local function process_mandates(create)
         return
     end
     local accessible = get_accessible_groups()
-    local pending, queued, satisfied, unsupported = 0, 0, 0, 0
+    local created, queued, satisfied, skipped = 0, 0, 0, 0
+    local function warn(m, msg)
+        dfhack.printerr(('automandate: %s: %s'):format(item_desc(m.item_type, m.item_subtype), msg))
+    end
     print(('%d active production mandate%s:'):format(#mandates, #mandates == 1 and '' or 's'))
     for _, m in ipairs(mandates) do
         print('  ' .. describe_mandate(m))
@@ -415,31 +451,54 @@ local function process_mandates(create)
         local unsup = t and t.any_material and UNSUPPORTED[df.item_type[t.item_type]]
         if not t then
             print('      -> SKIP: ' .. reason)
+            warn(m, reason)
+            skipped = skipped + 1
         elseif t.amount <= 0 then
             print('      -> [mandate already satisfied]')
             satisfied = satisfied + 1
         elseif unsup then
             print('      -> SKIP: ' .. unsup .. ' (material class not yet supported)')
-            unsupported = unsupported + 1
-        elseif find_matching_order(t) then
-            print(('      -> %s x%d  [matching order already queued]'):format(t.job_name, t.amount))
-            queued = queued + 1
+            warn(m, 'not auto-created: ' .. unsup)
+            skipped = skipped + 1
         else
+            local covered = matching_coverage(t)
+            local shortfall = t.amount - covered -- math.huge coverage -> negative
             local choice, cands
             if t.any_material then
                 choice, cands = choose_material(t.item_type, t.subtype, accessible)
             end
             local matstr = choice and choice.desc or material_desc(t.mat_type, t.mat_index)
-            print(('      -> %s x%d (%s)'):format(t.job_name, t.amount, matstr))
-            if cands then print_candidates(cands) end
-            if create then create_order(t, choice) end
-            pending = pending + 1
+            if shortfall <= 0 then
+                local cov = covered == math.huge and 'infinite' or tostring(covered)
+                print(('      -> %s  [%s already queued, covers mandate of %d]'):format(
+                    t.job_name, cov, t.amount))
+                queued = queued + 1
+            elseif choice and choice.count < shortfall then
+                -- not enough usable material to fully make the order: don't create it
+                local why = choice.count == 0
+                    and 'no usable material in stock'
+                    or ('only %d %s in stock, %d needed'):format(choice.count, matstr, shortfall)
+                print('      -> SKIP: ' .. why)
+                if cands then print_candidates(cands) end
+                warn(m, why .. '; no order created')
+                skipped = skipped + 1
+            else
+                if covered > 0 then
+                    print(('      -> %s x%d (%s)  [%d already queued, +%d to meet %d]'):format(
+                        t.job_name, shortfall, matstr, covered, shortfall, t.amount))
+                else
+                    print(('      -> %s x%d (%s)'):format(t.job_name, shortfall, matstr))
+                end
+                if cands then print_candidates(cands) end
+                if create then create_order(t, choice, shortfall) end
+                created = created + 1
+            end
         end
     end
     print()
     local verb = create and 'created' or 'would be created'
-    print(('automandate: %d order%s %s, %d already queued, %d satisfied, %d unsupported.'):format(
-        pending, pending == 1 and '' or 's', verb, queued, satisfied, unsupported))
+    print(('automandate: %d order%s %s, %d already queued, %d satisfied, %d skipped.'):format(
+        created, created == 1 and '' or 's', verb, queued, satisfied, skipped))
     if not create then
         print('Run `automandate now` to create the orders.')
     end
@@ -498,6 +557,20 @@ local function cmd_simulate()
             print_candidates(cands)
         end
     end
+end
+
+-- exported for the notify framework: number of active Make mandates that still
+-- need a work order (mappable, not yet satisfied, not already covered).
+function count_unfilled()
+    if not dfhack.world.isFortressMode() then return 0 end
+    local n = 0
+    for _, m in ipairs(get_make_mandates()) do
+        local t = resolve_target(m)
+        if t and t.amount > 0 and matching_coverage(t) < t.amount then
+            n = n + 1
+        end
+    end
+    return n
 end
 
 -- ------------------------------------------------------------------
