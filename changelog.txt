@@ -28,6 +28,8 @@ Template for new versions:
 
 ## New Tools
 
+- `gui/stockview`: enhanced fortress-wide stocks browser with search, filtering by item flags/quality/wear/value, grouping, bulk dump/forbid/melt/trade actions, and zoom-to-item
+
 ## New Features
 
 ## Fixes
