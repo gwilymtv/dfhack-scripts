@@ -19,8 +19,14 @@ per year, and 50 ticks per hour.
 Usage
 -----
 
-``timescape [list]``
-    Print the current formatted date to the console.
+``timescape``
+    Show usage and the current animation settings.
+
+``timescape anim on|off``
+    Enable or disable the art animation (useful for gauging its FPS cost).
+
+``timescape ticks <n>``
+    Regenerate the art at most once per ``n`` game ticks (``0`` = every tick).
 
 Overlay
 -------

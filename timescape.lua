@@ -13,7 +13,7 @@ DF time reference: 1200 ticks/day, 28 days/month, 12 months (336 days)/year, and
 
 Usage::
 
-    timescape              print the current formatted date to the console
+    timescape              show usage and current settings
     timescape anim on|off  enable or disable the animation (to gauge its FPS cost)
     timescape ticks <n>    regenerate the art at most once per <n> game ticks; the
                            cap is in game time, so it scales with game speed and
@@ -489,16 +489,27 @@ local function cap_str()
     return cfg.ticks > 0 and ('every '..cfg.ticks..' game ticks') or 'every tick (uncapped)'
 end
 
+local function print_help()
+    print('timescape: replace DF\'s stock fort date readout with a compact custom')
+    print('format plus procedurally-generated ASCII art. The display is an overlay,')
+    print('enabled by default, in the top-right of the fort map; align it with')
+    print('gui/overlay or by dragging in overlay edit mode.')
+    print('')
+    print('Commands:')
+    print('  timescape              show this help')
+    print('  timescape anim on|off  enable/disable the art animation (to gauge FPS cost)')
+    print('  timescape ticks <n>    redraw the art at most once per <n> game ticks')
+    print('                         (0 = every tick); game time: 50 ticks/hour, 1200/day')
+    print('  timescape help         show this help')
+    print('')
+    print(('Status: animation is %s; updating %s.'):format(
+        cfg.animate and 'on' or 'off', cap_str()))
+end
+
 local args = {...}
 local command = args[1]
-if command == 'help' or command == '?' then
-    print('Usage:')
-    print('  timescape              print the current formatted date')
-    print('  timescape anim on|off  enable/disable the animation (to gauge FPS cost)')
-    print('  timescape ticks <n>    update at most once per <n> game ticks (0 = every tick)')
-    print('                         game time: 50 ticks/hour, 1200 ticks/day')
-    print('  timescape help         show this help')
-    print(('animation is %s; updating %s'):format(cfg.animate and 'on' or 'off', cap_str()))
+if not command or command == 'help' or command == '?' then
+    print_help()
 elseif command == 'anim' then
     if args[2] == 'on' or args[2] == 'off' then
         cfg.animate = args[2] == 'on'
@@ -514,8 +525,7 @@ elseif command == 'ticks' then
     else
         print('animation is updating '..cap_str()..'; use: timescape ticks <n>  (0 = every tick)')
     end
-elseif command and command ~= 'list' then
-    dfhack.printerr('unknown command: '..command)
 else
-    print(get_date_string())
+    dfhack.printerr('unknown command: '..command)
+    print_help()
 end
