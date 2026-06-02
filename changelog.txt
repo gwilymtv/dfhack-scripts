@@ -28,6 +28,8 @@ Template for new versions:
 
 ## New Tools
 
+- `automandate`: create manager work orders to fulfill noble production mandates
+
 ## New Features
 
 ## Fixes
