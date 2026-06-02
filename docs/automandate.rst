@@ -40,3 +40,14 @@ Usage
     Show the work order that would be created for an any-material mandate of
     every mandatable item type, without changing anything. Useful for
     previewing material choices when you have no active mandates to test with.
+
+Automation
+----------
+
+``automandate`` can be run automatically on a schedule. Enable it from the
+Automation tab of `gui/control-panel`, where it runs ``automandate now``
+periodically.
+
+There is also an optional ``unfilled_mandates`` `notify` notification (off by
+default) that reports how many production mandates currently have no work
+order.

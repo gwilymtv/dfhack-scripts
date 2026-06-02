@@ -605,6 +605,21 @@ NOTIFICATIONS_BY_IDX = {
         end,
     },
     {
+        name='unfilled_mandates',
+        desc='Notifies when production mandates have no work order to fulfill them.',
+        default=false,
+        dwarf_fn=function()
+            local count = reqscript('automandate').count_unfilled()
+            if count > 0 then
+                return ('%d production mandate%s without a work order'):format(
+                    count, count == 1 and '' or 's')
+            end
+        end,
+        on_click=function()
+            gui.simulateInput(dfhack.gui.getDFViewscreen(), 'D_NOBLES')
+        end,
+    },
+    {
         name='petitions_agreed',
         desc='Notifies when you have agreed to build (but have not yet built) a guildhall or temple.',
         default=true,

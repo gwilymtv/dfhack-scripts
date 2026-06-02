@@ -559,6 +559,20 @@ local function cmd_simulate()
     end
 end
 
+-- exported for the notify framework: number of active Make mandates that still
+-- need a work order (mappable, not yet satisfied, not already covered).
+function count_unfilled()
+    if not dfhack.world.isFortressMode() then return 0 end
+    local n = 0
+    for _, m in ipairs(get_make_mandates()) do
+        local t = resolve_target(m)
+        if t and t.amount > 0 and matching_coverage(t) < t.amount then
+            n = n + 1
+        end
+    end
+    return n
+end
+
 -- ------------------------------------------------------------------
 -- dispatch
 -- ------------------------------------------------------------------
