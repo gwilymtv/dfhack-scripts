@@ -21,10 +21,16 @@ Usage
 
     automandate [list]
     automandate now
+    automandate simulate
 
 ``list`` (the default)
     Show all active production mandates and the work order each would create,
     without changing anything.
 
 ``now``
-    Create (or top up) a manager work order for every active production mandate.
+    Create a manager work order for every active production mandate.
+
+``simulate``
+    Show the work order that would be created for an any-material mandate of
+    every mandatable item type, without changing anything. Useful for
+    previewing material choices when you have no active mandates to test with.
