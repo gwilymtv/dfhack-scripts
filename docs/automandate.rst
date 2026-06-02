@@ -9,7 +9,10 @@ When a noble issues a production mandate (e.g. "Make maces (0/3)"),
 ``automandate`` resolves the mandated item to its production job and queues a
 manager work order to satisfy it. Mandates with no specific material requested
 pick the most abundant usable material in the fort (metal, stone, wood, leather,
-cloth, or bone).
+cloth, bone, or glass).
+
+If an item can't be mapped to a job, or the chosen material isn't in stock (so
+the order would stall until it is provided), a warning is printed.
 
 Existing matching orders count toward the mandate: if they already cover the
 mandated quantity (or an order is set to repeat indefinitely), nothing is added.
