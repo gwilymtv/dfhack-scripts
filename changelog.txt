@@ -29,6 +29,7 @@ Template for new versions:
 ## New Tools
 
 - `gui/stockview`: enhanced fortress-wide stocks browser with search, filtering by item flags/quality/wear/value, grouping, bulk dump/forbid/melt/trade actions, and zoom-to-item
+- `shortages`: watch job-cancellation announcements and show an on-screen summary of the materials your fort is currently short on
 
 ## New Features
 
