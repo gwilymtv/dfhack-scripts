@@ -31,6 +31,7 @@ Template for new versions:
 - `gui/stockview`: enhanced fortress-wide stocks browser with search, filtering by item flags/quality/wear/value, grouping, bulk dump/forbid/melt/trade actions, and zoom-to-item
 - `shortages`: watch job-cancellation announcements and show an on-screen summary of the materials your fort is currently short on
 - `timescape`: overlay the fort date readout with a custom compact format and a procedurally-generated ASCII art area
+- `automandate`: create manager work orders to fulfill noble production mandates
 
 ## New Features
 
