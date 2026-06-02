@@ -28,7 +28,7 @@ Template for new versions:
 
 ## New Tools
 
-- `dateformat`: overlay the fort date readout with a custom compact format and a procedurally-generated ASCII art area
+- `timescape`: overlay the fort date readout with a custom compact format and a procedurally-generated ASCII art area
 
 ## New Features
 

@@ -2,8 +2,8 @@
 --@module = true
 --[====[
 
-dateformat
-==========
+timescape
+=========
 Covers Dwarf Fortress's stock date readout in the top-right of the fort map with
 a compact custom format (``YYYY-MM-DD (Mon)``, e.g. ``173-08-15 (SND)``) plus ASCII
 art. The art is procedurally generated; edit ``get_art_lines`` to supply your own.
@@ -13,18 +13,18 @@ DF time reference: 1200 ticks/day, 28 days/month, 12 months (336 days)/year, and
 
 Usage::
 
-    dateformat              print the current formatted date to the console
-    dateformat anim on|off  enable or disable the animation (to gauge its FPS cost)
-    dateformat ticks <n>    regenerate the art at most once per <n> game ticks; the
-                            cap is in game time, so it scales with game speed and
-                            stops while paused. 0 = every tick (uncapped); default 5.
-                            Reference: 50 ticks/hour, 1200 ticks/day.
-    dateformat help         show this help
+    timescape              print the current formatted date to the console
+    timescape anim on|off  enable or disable the animation (to gauge its FPS cost)
+    timescape ticks <n>    regenerate the art at most once per <n> game ticks; the
+                           cap is in game time, so it scales with game speed and
+                           stops while paused. 0 = every tick (uncapped); default 5.
+                           Reference: 50 ticks/hour, 1200 ticks/day.
+    timescape help         show this help
 
 The display is an overlay (enabled by default). Reposition it over the stock date
 with ``gui/overlay`` or by dragging in overlay edit mode. To measure the overlay's
-full cost, disable it outright with ``overlay disable dateformat.date`` (this also
-restores the stock date readout); ``dateformat anim off`` instead isolates just the
+full cost, disable it outright with ``overlay disable timescape.date`` (this also
+restores the stock date readout); ``timescape anim off`` instead isolates just the
 animation's regeneration cost while keeping the display visible.
 
 ]====]
@@ -40,8 +40,8 @@ local TICKS_PER_HOUR = TICKS_PER_DAY // 24  -- 50
 -- saved across restarts). The art is procedural and regenerated as the game runs;
 -- these let you gauge and cap that cost. `CONFIG or {}` keeps the current settings
 -- if the module is reloaded. Toggle them with the command:
---   dateformat anim off    -- freeze the animation (generate once, then hold)
---   dateformat ticks <n>   -- update at most once per <n> game ticks (0 = every tick)
+--   timescape anim off    -- freeze the animation (generate once, then hold)
+--   timescape ticks <n>   -- update at most once per <n> game ticks (0 = every tick)
 -- The cap is in game ticks, so it tracks in-game time and pauses when the game does.
 -- Reference: 50 ticks/hour, 1200 ticks/day.
 CONFIG = CONFIG or {
@@ -478,12 +478,12 @@ if dfhack_flags.module then
 end
 
 if df.global.gamemode ~= df.game_mode.DWARF then
-    qerror('dateformat requires a loaded fortress')
+    qerror('timescape requires a loaded fortress')
 end
 
 -- reach the same CONFIG table the live overlay reads, regardless of how the command
 -- was loaded, so toggles take effect immediately.
-local cfg = reqscript('dateformat').CONFIG
+local cfg = reqscript('timescape').CONFIG
 
 local function cap_str()
     return cfg.ticks > 0 and ('every '..cfg.ticks..' game ticks') or 'every tick (uncapped)'
@@ -493,26 +493,26 @@ local args = {...}
 local command = args[1]
 if command == 'help' or command == '?' then
     print('Usage:')
-    print('  dateformat              print the current formatted date')
-    print('  dateformat anim on|off  enable/disable the animation (to gauge FPS cost)')
-    print('  dateformat ticks <n>    update at most once per <n> game ticks (0 = every tick)')
-    print('                          game time: 50 ticks/hour, 1200 ticks/day')
-    print('  dateformat help         show this help')
+    print('  timescape              print the current formatted date')
+    print('  timescape anim on|off  enable/disable the animation (to gauge FPS cost)')
+    print('  timescape ticks <n>    update at most once per <n> game ticks (0 = every tick)')
+    print('                         game time: 50 ticks/hour, 1200 ticks/day')
+    print('  timescape help         show this help')
     print(('animation is %s; updating %s'):format(cfg.animate and 'on' or 'off', cap_str()))
 elseif command == 'anim' then
     if args[2] == 'on' or args[2] == 'off' then
         cfg.animate = args[2] == 'on'
-        print('dateformat animation '..(cfg.animate and 'enabled' or 'disabled'))
+        print('timescape animation '..(cfg.animate and 'enabled' or 'disabled'))
     else
-        print('animation is '..(cfg.animate and 'on' or 'off')..'; use: dateformat anim on|off')
+        print('animation is '..(cfg.animate and 'on' or 'off')..'; use: timescape anim on|off')
     end
 elseif command == 'ticks' then
     local n = tonumber(args[2])
     if n and n >= 0 then
         cfg.ticks = math.floor(n)
-        print('dateformat animation updating '..cap_str())
+        print('timescape animation updating '..cap_str())
     else
-        print('animation is updating '..cap_str()..'; use: dateformat ticks <n>  (0 = every tick)')
+        print('animation is updating '..cap_str()..'; use: timescape ticks <n>  (0 = every tick)')
     end
 elseif command and command ~= 'list' then
     dfhack.printerr('unknown command: '..command)

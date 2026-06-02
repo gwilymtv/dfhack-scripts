@@ -1,5 +1,5 @@
-dateformat
-==========
+timescape
+=========
 
 .. dfhack-tool::
     :summary: Show a custom date format over the fort date display.
@@ -19,7 +19,7 @@ per year, and 50 ticks per hour.
 Usage
 -----
 
-``dateformat [list]``
+``timescape [list]``
     Print the current formatted date to the console.
 
 Overlay
