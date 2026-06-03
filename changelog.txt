@@ -28,6 +28,8 @@ Template for new versions:
 
 ## New Tools
 
+- `farmplot`: shift+click a crop in a farm plot to assign it to every season in which it can be planted
+
 ## New Features
 
 ## Fixes
