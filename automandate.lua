@@ -1,5 +1,6 @@
 -- Create manager work orders from active noble production mandates.
 --@ module = true
+--@ enable = true
 
 --[[
 automandate looks at the fort's active "Make X" production mandates (the ones
@@ -18,6 +19,17 @@ permissions; other items use a curated class list.
 
 local df = df
 local world = df.global.world
+local repeatutil = require('repeat-util')
+
+local GLOBAL_KEY = 'automandate'
+local CYCLE_DAYS = 14
+
+-- persistent enabled state (per fort)
+enabled = enabled or false
+
+function isEnabled()
+    return enabled
+end
 
 -- ------------------------------------------------------------------
 -- item_type -> production job resolver
@@ -312,6 +324,30 @@ local function choose_material(item_type, subtype, accessible)
     return cands[1], cands
 end
 
+-- raw-material input item categories scanned to count stock of a specific
+-- material (for mandates that name their own material).
+local MATERIAL_STOCK_OTHERS = {
+    'BAR', 'BOULDER', 'WOOD', 'SKIN_TANNED', 'CLOTH', 'CORPSEPIECE', 'ROUGH',
+}
+
+-- usable stock of one concrete material (mat_type/mat_index), across every raw
+-- input form. Each material has a single raw form, so matching mat_type and
+-- mat_index across all categories counts it without double counting.
+local function count_material_stock(mat_type, mat_index, accessible)
+    accessible = accessible or get_accessible_groups()
+    local n = 0
+    for _, other in ipairs(MATERIAL_STOCK_OTHERS) do
+        for _, item in ipairs(world.items.other[df.items_other_id[other]]) do
+            if item.mat_type == mat_type and item.mat_index == mat_index
+                and item_is_usable(item, accessible)
+            then
+                n = n + item.stack_size
+            end
+        end
+    end
+    return n
+end
+
 -- print the ranked candidate list under a result line (top = chosen)
 local MAX_CANDIDATES_SHOWN = 6
 local function print_candidates(cands)
@@ -431,12 +467,14 @@ local function describe_mandate(m)
         m.amount_remaining, m.amount_total, noble_name(m))
 end
 
--- Shared by `list` (create=false, dry run) and `now` (create=true). Both print
--- the same per-mandate breakdown; only order creation and the footer differ.
-local function process_mandates(create)
+-- Shared by `list` (create=false), `now` (create=true), and the background loop
+-- (create=true, quiet=true). `quiet` suppresses the per-mandate breakdown but
+-- keeps warnings and a one-line summary when orders are created.
+local function process_mandates(create, quiet)
+    local function say(s) if not quiet then print(s or '') end end
     local mandates = get_make_mandates()
     if #mandates == 0 then
-        print('No active production mandates.')
+        say('No active production mandates.')
         return
     end
     local accessible = get_accessible_groups()
@@ -444,45 +482,60 @@ local function process_mandates(create)
     local function warn(m, msg)
         dfhack.printerr(('automandate: %s: %s'):format(item_desc(m.item_type, m.item_subtype), msg))
     end
-    print(('%d active production mandate%s:'):format(#mandates, #mandates == 1 and '' or 's'))
+    say(('%d active production mandate%s:'):format(#mandates, #mandates == 1 and '' or 's'))
     for _, m in ipairs(mandates) do
-        print('  ' .. describe_mandate(m))
+        local desc = '  ' .. describe_mandate(m)
+        say(desc)
         local t, reason = resolve_target(m)
         local unsup = t and t.any_material and UNSUPPORTED[df.item_type[t.item_type]]
         if not t then
-            print('      -> SKIP: ' .. reason)
+            say('      -> SKIP: ' .. reason)
             warn(m, reason)
             skipped = skipped + 1
         elseif t.amount <= 0 then
-            print('      -> [mandate already satisfied]')
+            say('      -> [mandate already satisfied]')
             satisfied = satisfied + 1
         elseif unsup then
-            print('      -> SKIP: ' .. unsup .. ' (material class not yet supported)')
+            say('      -> SKIP: ' .. unsup .. ' (material class not yet supported)')
             warn(m, 'not auto-created: ' .. unsup)
             skipped = skipped + 1
         else
             local covered = matching_coverage(t)
             local shortfall = t.amount - covered -- math.huge coverage -> negative
-            local choice, cands
+            local choice, cands, avail
             if t.any_material then
                 choice, cands = choose_material(t.item_type, t.subtype, accessible)
+                avail = choice.count
+            elseif t.mat_index >= 0 or t.mat_type > 0 then
+                -- mandate names a concrete material: count just that material
+                avail = count_material_stock(t.mat_type, t.mat_index, accessible)
+            else
+                avail = math.huge -- unspecific (e.g. any-inorganic): don't stock-check
             end
             local matstr = choice and choice.desc or material_desc(t.mat_type, t.mat_index)
             if shortfall <= 0 then
                 local cov = covered == math.huge and 'infinite' or tostring(covered)
-                print(('      -> %s  [%s already queued, covers mandate of %d]'):format(
+                say(('      -> %s  [%s already queued, covers mandate of %d]'):format(
                     t.job_name, cov, t.amount))
                 queued = queued + 1
-            elseif choice and choice.count < shortfall then
+            elseif avail < shortfall then
                 -- not enough usable material to fully make the order: don't create it
-                local why = choice.count == 0
-                    and 'no usable material in stock'
-                    or ('only %d %s in stock, %d needed'):format(choice.count, matstr, shortfall)
-                print('      -> SKIP: ' .. why)
-                if cands then print_candidates(cands) end
+                local why
+                if avail == 0 then
+                    why = t.any_material and 'no usable material in stock'
+                        or ('no usable %s in stock'):format(matstr)
+                else
+                    why = ('only %d %s in stock, %d needed'):format(avail, matstr, shortfall)
+                end
+                say('      -> SKIP: ' .. why)
+                if not quiet and cands then print_candidates(cands) end
                 warn(m, why .. '; no order created')
                 skipped = skipped + 1
             else
+                -- always show the full breakdown for orders we actually create,
+                -- including the ranked material candidates, even in quiet mode --
+                -- the quiet loop just omits the no-op mandates and the summary
+                if quiet then print(desc) end
                 if covered > 0 then
                     print(('      -> %s x%d (%s)  [%d already queued, +%d to meet %d]'):format(
                         t.job_name, shortfall, matstr, covered, shortfall, t.amount))
@@ -495,12 +548,14 @@ local function process_mandates(create)
             end
         end
     end
-    print()
-    local verb = create and 'created' or 'would be created'
-    print(('automandate: %d order%s %s, %d already queued, %d satisfied, %d skipped.'):format(
-        created, created == 1 and '' or 's', verb, queued, satisfied, skipped))
-    if not create then
-        print('Run `automandate now` to create the orders.')
+    if not quiet then
+        say()
+        local verb = create and 'created' or 'would be created'
+        print(('automandate: %d order%s %s, %d already queued, %d satisfied, %d skipped.'):format(
+            created, created == 1 and '' or 's', verb, queued, satisfied, skipped))
+        if not create then
+            print('Run `automandate now` to create the orders.')
+        end
     end
 end
 
@@ -574,6 +629,48 @@ function count_unfilled()
 end
 
 -- ------------------------------------------------------------------
+-- enable / persistence / background loop
+-- ------------------------------------------------------------------
+local function persist_state()
+    dfhack.persistent.saveSiteData(GLOBAL_KEY, {enabled = enabled})
+end
+
+local function load_state()
+    enabled = dfhack.persistent.getSiteData(GLOBAL_KEY, {}).enabled or false
+end
+
+-- runs periodically while enabled: quietly fulfill mandates, then reschedule
+local function event_loop()
+    if not enabled then return end
+    process_mandates(true, true)
+    repeatutil.scheduleUnlessAlreadyScheduled(GLOBAL_KEY, CYCLE_DAYS, 'days', event_loop)
+end
+
+local function do_enable()
+    enabled = true
+    persist_state()
+    event_loop()
+end
+
+local function do_disable()
+    enabled = false
+    persist_state()
+    repeatutil.cancel(GLOBAL_KEY)
+end
+
+dfhack.onStateChange[GLOBAL_KEY] = function(sc)
+    if sc == SC_MAP_UNLOADED then
+        enabled = false
+        return
+    end
+    if sc ~= SC_MAP_LOADED or df.global.gamemode ~= df.game_mode.DWARF then
+        return
+    end
+    load_state()
+    event_loop()
+end
+
+-- ------------------------------------------------------------------
 -- dispatch
 -- ------------------------------------------------------------------
 if dfhack_flags.module then
@@ -584,17 +681,31 @@ if not dfhack.world.isFortressMode() then
     qerror('automandate requires fortress mode')
 end
 
-local actions = {
-    [''] = cmd_list,
-    ['list'] = cmd_list,
-    ['now'] = cmd_now,
-    ['simulate'] = cmd_simulate,
-    ['-?'] = function() print(dfhack.script_help()) end,
-    ['help'] = function() print(dfhack.script_help()) end,
-}
-
-local action = actions[(...) or '']
-if not action then
-    qerror('Unknown command: ' .. tostring((...)) .. ' (try: list, now, simulate)')
+-- control-panel toggles arrive as dfhack_flags.enable
+local args = {...}
+if dfhack_flags and dfhack_flags.enable then
+    args = {dfhack_flags.enable_state and 'enable' or 'disable'}
 end
-action(...)
+
+load_state()
+
+local cmd = args[1] or 'list'
+if cmd == 'enable' then
+    do_enable()
+    print('automandate enabled; will fulfill mandates every ' .. CYCLE_DAYS .. ' days.')
+elseif cmd == 'disable' then
+    do_disable()
+    print('automandate disabled.')
+elseif cmd == 'status' then
+    print('automandate is ' .. (enabled and 'enabled' or 'disabled') .. '.')
+elseif cmd == 'list' then
+    cmd_list()
+elseif cmd == 'now' then
+    cmd_now()
+elseif cmd == 'simulate' then
+    cmd_simulate()
+elseif cmd == 'help' or cmd == '-?' then
+    print(dfhack.script_help())
+else
+    qerror('Unknown command: ' .. tostring(cmd) .. ' (try: enable, disable, status, list, now, simulate)')
+end

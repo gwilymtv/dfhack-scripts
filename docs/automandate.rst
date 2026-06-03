@@ -11,8 +11,10 @@ manager work order to satisfy it. Mandates with no specific material requested
 pick the most abundant usable material in the fort (metal, stone, wood, leather,
 cloth, bone, or glass).
 
-If an item can't be mapped to a job, or the chosen material isn't in stock (so
-the order would stall until it is provided), a warning is printed.
+An order is only created when there is enough usable material in stock to make
+the full quantity -- whether the noble named the material or it was chosen
+automatically. If there isn't enough (or the item can't be mapped to a job),
+the mandate is skipped and a warning is printed instead.
 
 Existing matching orders count toward the mandate: if they already cover the
 mandated quantity (or an order is set to repeat indefinitely), nothing is added.
@@ -28,6 +30,7 @@ Usage
     automandate [list]
     automandate now
     automandate simulate
+    automandate enable|disable|status
 
 ``list`` (the default)
     Show all active production mandates and the work order each would create,
@@ -41,12 +44,18 @@ Usage
     every mandatable item type, without changing anything. Useful for
     previewing material choices when you have no active mandates to test with.
 
+``enable``/``disable``/``status``
+    Turn automatic fulfillment on or off, or report the current state.
+
 Automation
 ----------
 
-``automandate`` can be run automatically on a schedule. Enable it from the
-Automation tab of `gui/control-panel`, where it runs ``automandate now``
-periodically.
+When enabled, ``automandate`` fulfills mandates on a recurring cycle (every 14
+days). It stays quiet about mandates that need nothing, but for every order it
+creates it prints the full breakdown -- the job, quantity, and the ranked
+material candidates with the chosen one marked -- plus any warnings. The enabled
+state is saved per fortress. Toggle it here or from the Automation tab of
+`gui/control-panel`.
 
 There is also an optional ``unfilled_mandates`` `notify` notification (off by
 default) that reports how many production mandates currently have no work
