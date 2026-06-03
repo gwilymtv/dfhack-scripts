@@ -30,6 +30,7 @@ Usage
     automandate [list]
     automandate now
     automandate simulate
+    automandate enable|disable|status
 
 ``list`` (the default)
     Show all active production mandates and the work order each would create,
@@ -43,12 +44,18 @@ Usage
     every mandatable item type, without changing anything. Useful for
     previewing material choices when you have no active mandates to test with.
 
+``enable``/``disable``/``status``
+    Turn automatic fulfillment on or off, or report the current state.
+
 Automation
 ----------
 
-``automandate`` can be run automatically on a schedule. Enable it from the
-Automation tab of `gui/control-panel`, where it runs ``automandate now``
-periodically.
+When enabled, ``automandate`` fulfills mandates on a recurring cycle (every 14
+days). It stays quiet about mandates that need nothing, but for every order it
+creates it prints the full breakdown -- the job, quantity, and the ranked
+material candidates with the chosen one marked -- plus any warnings. The enabled
+state is saved per fortress. Toggle it here or from the Automation tab of
+`gui/control-panel`.
 
 There is also an optional ``unfilled_mandates`` `notify` notification (off by
 default) that reports how many production mandates currently have no work

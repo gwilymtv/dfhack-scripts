@@ -26,9 +26,8 @@ COMMANDS_BY_IDX = {
         desc='Enable if you usually farm pig tails for the clothing industry.'},
     {command='autofish', group='automation', mode='enable'},
     --{command='autolabor', group='automation', mode='enable'}, -- hide until it works better
-    {command='automandate', group='automation', mode='repeat',
-        desc='Automatically create manager orders to fulfill noble production mandates.',
-        params={'--time', '14', '--timeUnits', 'days', '--command', '[', 'automandate', 'now', ']'}},
+    {command='automandate', group='automation', mode='enable',
+        desc='Automatically create manager orders to fulfill noble production mandates.'},
     {command='automilk', help_command='workorder', group='automation', mode='repeat',
         desc='Automatically milk creatures that are ready for milking.',
         params={'--time', '14', '--timeUnits', 'days', '--command', '[', 'workorder', '"{\\"job\\":\\"MilkCreature\\",\\"item_conditions\\":[{\\"condition\\":\\"AtLeast\\",\\"value\\":2,\\"flags\\":[\\"empty\\"],\\"item_type\\":\\"BUCKET\\"}]}"', ']'}},
