@@ -10,12 +10,12 @@ hovering over each to read its name. This tool adds a searchable, left-docked
 list of all sites to the world map -- both the in-fortress world map and the
 world map shown when choosing an embark site for a new fort.
 
-Press :kbd:`Ctrl`:kbd:`F` to activate the search and type to filter the list by
-name, then select a site (click it or highlight it and press :kbd:`Enter`) to
-center the map on it and mark it with a blinking ``X``. Changing the search
-clears the mark. While the search is not active, the world map remains fully
-usable underneath the panel -- you can pan, zoom, and click its buttons as
-normal.
+It starts as a small ``Find site`` button. Click it or press :kbd:`Ctrl`:kbd:`F`
+to open the search panel, then type to filter the list by name and select a site
+(click it or highlight it and press :kbd:`Enter`) to center the map on it and
+mark it with a blinking ``X``. Press :kbd:`Esc` to close the panel, which clears
+the mark. While the panel is closed the world map remains fully usable -- you can
+pan, zoom, and click its buttons as normal.
 
 Overlay
 -------

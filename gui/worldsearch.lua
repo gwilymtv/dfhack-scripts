@@ -86,42 +86,92 @@ WorldSearchOverlay.ATTRS{
     default_pos={x=1, y=5},
     viewscreens={'world/NORMAL', 'choose_start_site'},
     frame={w=34, h=32},
-    frame_style=gui.FRAME_PANEL,
-    frame_background=BG_PEN,
-    frame_title='Find site',
 }
 
 function WorldSearchOverlay:init()
     self.marked = nil
+    self.expanded = false
     self:addviews{
-        widgets.FilteredList{
-            view_id='list',
-            frame={t=0, l=0, r=0, b=2},
-            -- search stays dormant until activated, so the world map's
-            -- WASD/cursor keys aren't typed into the box (shared keys)
-            edit_key='CUSTOM_CTRL_F',
-            on_submit=function(_, choice)
-                self:mark_site(choice and choice.site)
-            end,
-            edit_on_change=function()
-                -- changing the search clears the current mark
-                self.marked = nil
-            end,
+        -- collapsed launcher button
+        widgets.Panel{
+            view_id='launcher',
+            frame={t=0, l=0, w=21, h=3},
+            frame_style=gui.FRAME_PANEL,
+            frame_background=BG_PEN,
+            visible=function() return not self.expanded end,
+            subviews={
+                widgets.HotkeyLabel{
+                    frame={t=0, l=0},
+                    key='CUSTOM_CTRL_F',
+                    label='Find site',
+                    on_activate=function() self:set_expanded(true) end,
+                },
+            },
         },
-        widgets.Label{
-            frame={b=0, l=0},
-            text={
-                {text='Ctrl+F', pen=COLOR_LIGHTGREEN}, ': search', NEWLINE,
-                {text='Enter/click', pen=COLOR_LIGHTGREEN}, ': locate',
+        -- expanded search panel
+        widgets.Panel{
+            view_id='panel',
+            frame={t=0, l=0, w=34, h=32},
+            frame_style=gui.FRAME_PANEL,
+            frame_background=BG_PEN,
+            frame_title='Find site',
+            visible=function() return self.expanded end,
+            subviews={
+                widgets.FilteredList{
+                    view_id='list',
+                    frame={t=0, l=0, r=0, b=2},
+                    -- search stays dormant until activated, so the world map's
+                    -- WASD/cursor keys aren't typed into the box (shared keys)
+                    edit_key='CUSTOM_CTRL_F',
+                    on_submit=function(_, choice)
+                        self:mark_site(choice and choice.site)
+                    end,
+                    edit_on_change=function()
+                        -- changing the search clears the current mark
+                        self.marked = nil
+                    end,
+                },
+                widgets.Label{
+                    frame={b=0, l=0},
+                    text={
+                        {text='Enter/click', pen=COLOR_LIGHTGREEN}, ': locate',
+                        NEWLINE,
+                        {text='Esc/right-click', pen=COLOR_LIGHTGREEN}, ': close',
+                    },
+                },
             },
         },
     }
     self.subviews.list:setChoices(build_choices())
 end
 
+function WorldSearchOverlay:set_expanded(expanded)
+    self.expanded = expanded
+    local edit = self.subviews.list.edit
+    if expanded then
+        if edit then edit:setFocus(true) end
+    else
+        -- collapsing dismisses the marker and the search
+        self.marked = nil
+        if edit then edit:setFocus(false) end
+    end
+end
+
 function WorldSearchOverlay:onInput(keys)
+    -- when open, a single Esc closes the panel (and clears the marker), even if
+    -- the search box has focus -- checked before the widgets so the EditField
+    -- doesn't swallow it just to defocus itself
+    if self.expanded and (keys.LEAVESCREEN or keys._MOUSE_R) then
+        self:set_expanded(false)
+        return true
+    end
     if WorldSearchOverlay.super.onInput(self, keys) then
         return true
+    end
+    -- collapsed: only the launcher button/hotkey reacts (handled above); let
+    -- everything else through to the map
+    if not self.expanded then
+        return false
     end
     -- while the search box has focus, swallow non-mouse keys: the letters
     -- double as world-map pan keys, so letting them through would move the map
