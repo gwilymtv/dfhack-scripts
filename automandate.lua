@@ -312,6 +312,30 @@ local function choose_material(item_type, subtype, accessible)
     return cands[1], cands
 end
 
+-- raw-material input item categories scanned to count stock of a specific
+-- material (for mandates that name their own material).
+local MATERIAL_STOCK_OTHERS = {
+    'BAR', 'BOULDER', 'WOOD', 'SKIN_TANNED', 'CLOTH', 'CORPSEPIECE', 'ROUGH',
+}
+
+-- usable stock of one concrete material (mat_type/mat_index), across every raw
+-- input form. Each material has a single raw form, so matching mat_type and
+-- mat_index across all categories counts it without double counting.
+local function count_material_stock(mat_type, mat_index, accessible)
+    accessible = accessible or get_accessible_groups()
+    local n = 0
+    for _, other in ipairs(MATERIAL_STOCK_OTHERS) do
+        for _, item in ipairs(world.items.other[df.items_other_id[other]]) do
+            if item.mat_type == mat_type and item.mat_index == mat_index
+                and item_is_usable(item, accessible)
+            then
+                n = n + item.stack_size
+            end
+        end
+    end
+    return n
+end
+
 -- print the ranked candidate list under a result line (top = chosen)
 local MAX_CANDIDATES_SHOWN = 6
 local function print_candidates(cands)
@@ -463,9 +487,15 @@ local function process_mandates(create)
         else
             local covered = matching_coverage(t)
             local shortfall = t.amount - covered -- math.huge coverage -> negative
-            local choice, cands
+            local choice, cands, avail
             if t.any_material then
                 choice, cands = choose_material(t.item_type, t.subtype, accessible)
+                avail = choice.count
+            elseif t.mat_index >= 0 or t.mat_type > 0 then
+                -- mandate names a concrete material: count just that material
+                avail = count_material_stock(t.mat_type, t.mat_index, accessible)
+            else
+                avail = math.huge -- unspecific (e.g. any-inorganic): don't stock-check
             end
             local matstr = choice and choice.desc or material_desc(t.mat_type, t.mat_index)
             if shortfall <= 0 then
@@ -473,11 +503,15 @@ local function process_mandates(create)
                 print(('      -> %s  [%s already queued, covers mandate of %d]'):format(
                     t.job_name, cov, t.amount))
                 queued = queued + 1
-            elseif choice and choice.count < shortfall then
+            elseif avail < shortfall then
                 -- not enough usable material to fully make the order: don't create it
-                local why = choice.count == 0
-                    and 'no usable material in stock'
-                    or ('only %d %s in stock, %d needed'):format(choice.count, matstr, shortfall)
+                local why
+                if avail == 0 then
+                    why = t.any_material and 'no usable material in stock'
+                        or ('no usable %s in stock'):format(matstr)
+                else
+                    why = ('only %d %s in stock, %d needed'):format(avail, matstr, shortfall)
+                end
                 print('      -> SKIP: ' .. why)
                 if cands then print_candidates(cands) end
                 warn(m, why .. '; no order created')
