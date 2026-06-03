@@ -28,6 +28,8 @@ Template for new versions:
 
 ## New Tools
 
+- `gui/worldsearch`: search for and locate sites on the fortress-mode world map
+
 ## New Features
 
 ## Fixes
