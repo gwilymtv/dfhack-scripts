@@ -1,4 +1,4 @@
--- Search for a site by name on the fortress-mode world map and locate it.
+-- Search for a site by name on the world map (in-fort or embark) and locate it.
 --@ module = true
 
 local overlay = require('plugins.overlay')
@@ -61,6 +61,20 @@ local function build_choices()
     return choices
 end
 
+-- Returns the active world/embark map viewscreen (or nil) and whether a marker
+-- can be drawn on it now. Both the in-fort world map and the embark map use the
+-- same region_cent + transform; the embark map's zoomed view uses a different
+-- transform we don't handle, so the marker is suppressed there.
+local function get_map_scr()
+    local scr = dfhack.gui.getDFViewscreen(true)
+    if df.viewscreen_worldst:is_instance(scr) then
+        return scr, true
+    end
+    if df.viewscreen_choose_start_sitest:is_instance(scr) then
+        return scr, not scr.zoomed_in
+    end
+end
+
 -- ----------------- --
 -- WorldSearchOverlay --
 -- ----------------- --
@@ -70,7 +84,7 @@ WorldSearchOverlay.ATTRS{
     desc='Searchable list of world sites; locate one with a blinking marker.',
     default_enabled=true,
     default_pos={x=1, y=5},
-    viewscreens='world/NORMAL',
+    viewscreens={'world/NORMAL', 'choose_start_site'},
     frame={w=34, h=32},
     frame_style=gui.FRAME_PANEL,
     frame_background=BG_PEN,
@@ -121,8 +135,8 @@ end
 function WorldSearchOverlay:mark_site(site)
     self.marked = site
     if not site then return end
-    local scr = dfhack.gui.getDFViewscreen(true)
-    if df.viewscreen_worldst:is_instance(scr) then
+    local scr = get_map_scr()
+    if scr then
         scr.region_cent_x = site.pos.x
         scr.region_cent_y = site.pos.y
     end
@@ -131,8 +145,8 @@ end
 function WorldSearchOverlay:onRenderBody(dc)
     local site = self.marked
     if not site then return end
-    local scr = dfhack.gui.getDFViewscreen(true)
-    if not df.viewscreen_worldst:is_instance(scr) then return end
+    local scr, drawable = get_map_scr()
+    if not scr or not drawable then return end
     -- blink
     if (dfhack.getTickCount() // BLINK_MS) % 2 == 1 then return end
     local px, py = world_to_screen(site.pos, scr.region_cent_x, scr.region_cent_y)
