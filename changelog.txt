@@ -30,6 +30,8 @@ Template for new versions:
 
 ## New Features
 
+- `markdown`: added ``-c``/``--clipboard`` to copy the exported text to the system clipboard, and ``-p``/``--print`` to print it to the console, instead of writing it to a file
+
 ## Fixes
 
 ## Misc Improvements

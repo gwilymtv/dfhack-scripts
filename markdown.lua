@@ -9,9 +9,12 @@ local argparse = require('argparse')
 local worldName = dfhack.df2utf(dfhack.translation.translateName(df.global.world.world_data.name)):gsub(" ", "_")
 
 local help, overwrite, filenameArg = false, false, nil
+local output = 'file' -- where to send the result: 'file', 'clipboard', or 'console'
 local positionals = argparse.processArgsGetopt({ ... }, {
-    {'o', 'overwrite', handler=function() overwrite = true end},
-    {'h', 'help',      handler=function() help = true end},
+    {'o', 'overwrite',  handler=function() overwrite = true end},
+    {'c', 'clipboard',  handler=function() output = 'clipboard' end},
+    {'p', 'print',      handler=function() output = 'console' end},
+    {'h', 'help',       handler=function() help = true end},
 })
 
 -- Extract non-option arguments (filename)
@@ -26,22 +29,38 @@ end
 local writemode = overwrite and 'w' or 'a'
 local filename = 'markdown_' .. (filenameArg or worldName) .. '.md'
 
--- Utility functions
-local function getFileHandle()
-    local handle, error = io.open(filename, writemode)
-    if not handle then
-        qerror("Error opening file: " .. filename .. ". " .. error)
-    end
-    return handle
+-- DF text is CP437; convert each piece to the target's encoding as we build the
+-- markdown. The clipboard wants CP437 as-is, so it needs no conversion.
+local convert = output == 'console' and dfhack.df2console
+    or output == 'clipboard' and function(str) return str end
+    or dfhack.df2utf
+
+local buffer = {}
+local function emit(str)
+    table.insert(buffer, str)
 end
 
-local function closeFileHandle(handle)
-    handle:write('\n---\n\n')
-    handle:close()
-    if writemode == 'a' then
-        print('\nData appended to "' .. 'Dwarf Fortress/' .. filename .. '"')
-    elseif writemode == 'w' then
-        print('\nData overwritten in "' .. 'Dwarf Fortress/' .. filename .. '"')
+-- Send the assembled markdown to the chosen target.
+local function flush()
+    local content = table.concat(buffer)
+    if output == 'clipboard' then
+        dfhack.internal.setClipboardTextCp437Multiline(content)
+        print('\nData copied to clipboard.')
+    elseif output == 'console' then
+        print('\n' .. content)
+    else
+        local handle, error = io.open(filename, writemode)
+        if not handle then
+            qerror("Error opening file: " .. filename .. ". " .. error)
+        end
+        handle:write(content)
+        handle:write('\n---\n\n')
+        handle:close()
+        if writemode == 'a' then
+            print('\nData appended to "' .. 'Dwarf Fortress/' .. filename .. '"')
+        elseif writemode == 'w' then
+            print('\nData overwritten in "' .. 'Dwarf Fortress/' .. filename .. '"')
+        end
     end
 end
 
@@ -78,8 +97,6 @@ Please select a valid target and try running the script again.]])
     return
 end
 
-local log = getFileHandle()
-
 local gps = df.global.gps
 local mi = df.global.game.main_interface
 
@@ -87,8 +104,8 @@ if item then
     -- Item processing
     local itemRawName = dfhack.items.getDescription(item, 0, true)
     local itemRawDescription = mi.view_sheets.raw_description
-    log:write('### ' ..
-        dfhack.df2utf(itemRawName) .. '\n\n#### Description: \n' .. reformat(dfhack.df2utf(itemRawDescription)) .. '\n')
+    emit('### ' ..
+        convert(itemRawName) .. '\n\n#### Description: \n' .. reformat(convert(itemRawDescription)) .. '\n')
     print('Exporting description of the ' .. itemRawName)
 elseif unit then
     -- Unit processing
@@ -127,16 +144,16 @@ elseif unit then
     local unit_description_raw = #mi.view_sheets.unit_health_raw_str > 0 and mi.view_sheets.unit_health_raw_str[0].value or ''
     local unit_personality_raw = mi.view_sheets.personality_raw_str
 
-    log:write('### ' ..
-        dfhack.df2utf(getNameRaceAgeProf(unit)) ..
-        '\n\n#### Description: \n' .. reformat(dfhack.df2utf(unit_description_raw)) .. '\n')
+    emit('### ' ..
+        convert(getNameRaceAgeProf(unit)) ..
+        '\n\n#### Description: \n' .. reformat(convert(unit_description_raw)) .. '\n')
     if #unit_personality_raw > 0 then
-        log:write('\n#### Personality: \n')
+        emit('\n#### Personality: \n')
         for _, unit_personality in ipairs(unit_personality_raw) do
-            log:write(reformat(dfhack.df2utf(unit_personality.value)) .. '\n')
+            emit(reformat(convert(unit_personality.value)) .. '\n')
         end
     end
     print('Exporting Health/Description & Personality/Traits data for: \n' .. dfhack.df2console(getNameRaceAgeProf(unit)))
 end
 
-closeFileHandle(log)
+flush()

@@ -107,6 +107,12 @@ Options
 ``-o``, ``--overwrite``
     Overwrite the output file, deleting previous entries.
 
+``-c``, ``--clipboard``
+    Copy the output to the system clipboard instead of writing it to a file.
+
+``-p``, ``--print``
+    Print the output to the DFHack console instead of writing it to a file.
+
 Setting up custom keybindings
 -----------------------------
 
