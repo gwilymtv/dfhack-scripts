@@ -61,8 +61,15 @@ function AllSeasonsOverlay:init()
     }
 end
 
--- copy plant_id to every season whose plant_raw allows planting then
+-- copy plant_id to every season whose plant_raw allows planting;
+-- fallow (plant_id < 0) clears the crop for every season
 function AllSeasonsOverlay:propagate(farm, plant_id)
+    if plant_id < 0 then
+        for s = 0, 3 do
+            farm.plant_id[s] = -1
+        end
+        return
+    end
     local plant = df.plant_raw.find(plant_id)
     if not plant then return end
     for s = 0, 3 do
@@ -104,8 +111,8 @@ function AllSeasonsOverlay:render(dc)
                     df.global.world.frame_counter, self.armed,
                     snap_names(self.prev), snap_names(cur), tostring(changed)))
             end
-            -- only propagate a real crop (>= 0) that changed within the armed window
-            if changed and self.armed > 0 and cur[changed+1] >= 0 then
+            -- propagate any change within the armed window, including fallow (-1)
+            if changed and self.armed > 0 then
                 if DEBUG then
                     print(('[farmplot] PROPAGATE season %d -> %s'):format(
                         changed, plant_name(cur[changed+1])))
