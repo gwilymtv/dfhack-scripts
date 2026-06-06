@@ -34,6 +34,7 @@ Template for new versions:
 - `automandate`: create manager work orders to fulfill noble production mandates
 - `gui/worldsearch`: search for and locate sites on the fortress-mode world map
 - `gui/worldsearch`: search for and locate sites on the world map, both in-fort and when choosing an embark site
+- `farmplot`: shift+click a crop in a farm plot to assign it to every season in which it can be planted
 
 ## New Features
 
