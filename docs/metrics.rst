@@ -47,6 +47,7 @@ Usage
     metrics now
     metrics dump
     metrics clear
+    metrics gui
 
 ``status`` (the default)
     Report whether collection is enabled and how many data points have been
@@ -69,3 +70,6 @@ Usage
 
 ``clear``
     Discard all recorded data points for this fort.
+
+``gui``
+    Open `gui/metrics` to plot the recorded series as a chart.

@@ -47,9 +47,10 @@ local STRESS_BUCKET_NAMES = {'ecstatic', 'happy', 'pleased', 'content',
                              'displeased', 'unhappy', 'miserable'}
 local NUM_BANDS = #STRESS_BUCKET_NAMES
 
--- display columns keep the conventional most-stressed-first reading order
-local DISPLAY_ORDER = {'miserable', 'unhappy', 'displeased', 'content',
-                       'pleased', 'happy', 'ecstatic'}
+-- display columns keep the conventional most-stressed-first reading order.
+-- Exported (module global) so gui/metrics can label the happiness bands.
+DISPLAY_ORDER = {'miserable', 'unhappy', 'displeased', 'content',
+                 'pleased', 'happy', 'ecstatic'}
 
 -- Finite bucket upper bounds (Prometheus 'le'), 1-indexed and ascending, length
 -- NUM_BANDS-1; the top bucket's bound is +inf and is left implicit. Derived from
@@ -162,6 +163,12 @@ end
 
 local function save_data(data)
     dfhack.persistent.saveSiteData(GLOBAL_KEY, data)
+end
+
+-- the recorded series (oldest..newest), for read-only consumers like gui/metrics.
+-- Returns the live array from site data; callers should treat it as read-only.
+function get_series()
+    return load_data().series
 end
 
 local function load_state()
@@ -325,8 +332,8 @@ end
 -- per-band citizen counts keyed by band name (so display can use any order).
 -- De-cumulates the snapshot's cumulative histogram; tolerates snapshots predating
 -- the histogram (legacy plain-count `happiness` map) or with no stress data at all.
--- For display only.
-local function band_counts(snap)
+-- For display only. Exported for gui/metrics.
+function band_counts(snap)
     local counts = {}
     if snap.stress then
         local prev = 0
@@ -653,10 +660,12 @@ elseif cmd == 'now' then
     cmd_now()
 elseif cmd == 'dump' then
     cmd_dump()
+elseif cmd == 'gui' then
+    dfhack.run_script('gui/metrics')
 elseif cmd == 'clear' then
     cmd_clear()
 elseif cmd == 'help' or cmd == '-?' then
     print(dfhack.script_help())
 else
-    qerror('Unknown command: ' .. tostring(cmd) .. ' (try: enable, disable, status, now, dump, clear)')
+    qerror('Unknown command: ' .. tostring(cmd) .. ' (try: enable, disable, status, now, dump, clear, gui)')
 end

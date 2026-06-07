@@ -29,6 +29,7 @@ Template for new versions:
 ## New Tools
 
 - `metrics`: record a daily snapshot of fort-wide figures (population, military, pets/livestock and other creatures, workshops and active workshops, happiness stress histogram, wealth breakdown, and stocks) and dump the time series to the console as CSV
+- `gui/metrics`: resizable window that charts the `metrics` time series as ASCII, with any number of selectable series spread across an auto-scaling left and right axis
 
 ## New Features
 
