@@ -28,7 +28,7 @@ Template for new versions:
 
 ## New Tools
 
-- `gui/worldsearch`: search for and locate sites on the world map, both in-fort and when choosing an embark site
+- `gui/worldsearch`: search for and locate sites on the world map, both in-fort and when choosing an embark site, including during world generation; shows each site's owner race, population, and biome savagery, lets you hover a site for a per-race population breakdown, and opens in a movable, resizable window
 
 ## New Features
 
