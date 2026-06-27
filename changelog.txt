@@ -36,6 +36,7 @@ Template for new versions:
 - `gui/worldsearch`: search for and locate sites on the world map, both in-fort and when choosing an embark site
 - `farmplot`: shift+click a crop in a farm plot to assign it to every season in which it can be planted
 - `gui/combat-log`: compact, real-time combat log window for a single unit, with optional pause-on-new-entry, click-to-zoom, and persistent position/size
+- `gui/worldsearch`: search for and locate sites on the world map, both in-fort and when choosing an embark site, including during world generation; shows each site's owner race, population, and biome savagery, lets you hover a site for a per-race population breakdown, and opens in a movable, resizable window
 
 ## New Features
 
