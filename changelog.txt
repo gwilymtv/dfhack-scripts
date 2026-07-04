@@ -39,6 +39,7 @@ Template for new versions:
 - `gui/worldsearch`: search for and locate sites on the world map, both in-fort and when choosing an embark site, including during world generation; shows each site's owner race, population, and biome savagery, lets you hover a site for a per-race population breakdown, and opens in a movable, resizable window
 - `metrics`: record a daily snapshot of fort-wide figures (population, military, pets/livestock and other creatures, workshops and active workshops, happiness stress histogram, wealth breakdown, and stocks) and dump the time series to the console as CSV
 - `gui/metrics`: resizable window that charts the `metrics` time series as ASCII, with any number of selectable series spread across an auto-scaling left and right axis
+- `nestegg`: roam-friendly nestbox manager that pastures animals onto nestboxes they have claimed and otherwise leaves them free to roam
 
 ## New Features
 
