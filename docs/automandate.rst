@@ -57,6 +57,6 @@ material candidates with the chosen one marked -- plus any warnings. The enabled
 state is saved per fortress. Toggle it here or from the Automation tab of
 `gui/control-panel`.
 
-There is also an optional ``unfilled_mandates`` `notify` notification (off by
+There is also an optional ``unfilled_mandates`` `gui/notify` notification (off by
 default) that reports how many production mandates currently have no work
 order.
